@@ -44,13 +44,12 @@ UKF::UKF() {
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
 
-  MatrixXd Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
-
   n_x_ = 5;
   n_aug_ = 7;
   lambda_ = 3 - n_aug_;
   is_initialized_=false;
 
+  MatrixXd Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
   VectorXd weights_ = VectorXd(2*n_aug_+1);
   double weight_0 = lambda_/(lambda_+n_aug_);
   weights_(0) = weight_0;
@@ -69,15 +68,14 @@ UKF::~UKF() {}
 void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   if (!is_initialized_){
     time_us_ = meas_package.timestamp_;
-    P_ = MatrixXd(5,5);
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_){
-      float ro = meas_package.raw_measurements_[0];
-      float theta = meas_package.raw_measurements_[1];
-      float ro_dot = meas_package.raw_measurements_[2];
+      float ro = meas_package.raw_measurements_(0);
+      float theta = meas_package.raw_measurements_(1);
+      float ro_dot = meas_package.raw_measurements_(2);
       x_ << ro*cos(theta), -ro*sin(theta), ro_dot, 0, 0;
 
     } else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_){
-      x_ << meas_package[0], meas_package[1], 0, 0, 0;
+      x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 0, 0, 0;
     }
     P_ <<   1, 0, 0, 0, 0,
             0, 1, 0, 0, 0,
@@ -88,6 +86,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     return;
   }
   double dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
+
   Prediction(dt);
 
   if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_){
@@ -103,20 +102,15 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
  * measurement and this one.
  */
 void UKF::Prediction(double delta_t) {
-  /**
-  TODO:
 
-  Complete this function! Estimate the object's location. Modify the state
-  vector, x_. Predict sigma points, the state, and the state covariance matrix.
-  */
   //create augmented mean vector
-  VectorXd x_aug = VectorXd(7);
+  VectorXd x_aug = VectorXd(n_aug_);
   x_aug.head(5) = x_;
   x_aug(5) = 0;
   x_aug(6) = 0;
 
   //create augmented state covariance
-  MatrixXd P_aug = MatrixXd(7, 7);
+  MatrixXd P_aug = MatrixXd(n_aug_, n_aug_);
   //create augmented covariance matrix
   P_aug.fill(0.0);
   P_aug.topLeftCorner(5,5) = P_;
@@ -188,19 +182,12 @@ void UKF::Prediction(double delta_t) {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
-  /**
-  TODO:
 
-  Complete this function! Use lidar data to update the belief about the object's
-  position. Modify the state vector, x_, and covariance, P_.
-
-  You'll also need to calculate the lidar NIS.
-  */
   int n_z = 2;
   //create matrix for sigma points in measurement space
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
   VectorXd z = VectorXd(n_z);
-  z << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1];
+  z << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1);
 
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
     // extract values for better readibility
@@ -249,19 +236,12 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
-  /**
-  TODO:
 
-  Complete this function! Use radar data to update the belief about the object's
-  position. Modify the state vector, x_, and covariance, P_.
-
-  You'll also need to calculate the radar NIS.
-  */
   int n_z = 3;
   //create matrix for sigma points in measurement space
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
   VectorXd z = VectorXd(n_z);
-  z << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], meas_package.raw_measurements_[2]
+  z << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), meas_package.raw_measurements_(2);
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
 
     // extract values for better readibility
