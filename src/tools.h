@@ -24,6 +24,8 @@ public:
   */
   VectorXd CalculateRMSE(const vector<VectorXd> &estimations, const vector<VectorXd> &ground_truth);
 
+    void Normalize(VectorXd& x_diff, int i);
+
 };
 
 #endif /* TOOLS_H_ */

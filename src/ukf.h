@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
-
+#include "tools.h"
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
@@ -67,6 +67,7 @@ public:
   ///* Sigma point spreading parameter
   double lambda_;
 
+    Tools tools;
 
   /**
    * Constructor
