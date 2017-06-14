@@ -21,14 +21,10 @@ UKF::UKF() {
   x_ = VectorXd(5);
 
   // initial covariance matrix
-  P_ = MatrixXd(5, 5);
-  P_ <<   1, 0, 0, 0, 0,
-          0, 1, 0, 0, 0,
-          0, 0, 1, 0, 0,
-          0, 0, 0, 1, 0,
-          0, 0, 0, 0, 1;
+  P_ = MatrixXd::Identity(5, 5);
+
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 8;
+  std_a_ = 0.5;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
   std_yawdd_ = 1;
@@ -49,6 +45,7 @@ UKF::UKF() {
   std_radrd_ = 0.3;
 
 
+  NIS = 0.0;
   n_x_ = 5;
   n_aug_ = 7;
   lambda_ = 3 - n_aug_;
@@ -73,15 +70,17 @@ UKF::~UKF() {}
  * either radar or laser.
  */
 void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
+
+  // It has to be initialized NO MATTER WHAT!
   if (!is_initialized_){
     time_us_ = meas_package.timestamp_;
-    if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_){
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR){
       float ro = meas_package.raw_measurements_(0);
       float theta = meas_package.raw_measurements_(1);
       float ro_dot = meas_package.raw_measurements_(2);
       x_ << ro*cos(theta), ro*sin(theta), ro_dot, 0, 0;
 
-    } else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_){
+    } else if (meas_package.sensor_type_ == MeasurementPackage::LASER){
       x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 0, 0, 0;
     }
     is_initialized_ = true;
@@ -99,6 +98,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   }else if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_){
     UpdateLidar(meas_package);
   }
+
 }
 
 /**
@@ -254,7 +254,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
 
-//  double NIS = z_diff.transpose()*S.inverse()*z_diff;
+  NIS = z_diff.transpose()*S.inverse()*z_diff;
 }
 
 /**
@@ -281,11 +281,18 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
     // measurement model
     Zsig(0,i) = sqrt(p_x*p_x + p_y*p_y);                        //r
-    if (p_x < 1e-6) p_x = 1e-6;
-    Zsig(1,i) = atan2(p_y,p_x);                                 //phi
-    Zsig(2,i) = (p_x*v1 + p_y*v2 ) / sqrt(p_x*p_x + p_y*p_y);   //r_dot
+    if ((fabs(p_x) > 0.001) && (fabs(p_y) > 0.001)){
+      Zsig(1,i) = atan2(p_y,p_x);                               //phi
+    } else{
+      Zsig(1,i) = 0;
+    }
+    if (fabs(sqrt(p_x*p_x + p_y*p_y)) > 0.001) {
+      Zsig(2, i) = (p_x * v1 + p_y * v2) / sqrt(p_x * p_x + p_y * p_y);   //r_dot
+    }else{
+      Zsig(2, i) = 0;
+    }
   }
-  
+
   //mean predicted measurement
   VectorXd z_pred = VectorXd(n_z);
   z_pred.fill(0.0);
@@ -332,5 +339,5 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
 
-//  double NIS = z_diff.transpose()*S.inverse()*z_diff;
+  NIS = z_diff.transpose()*S.inverse()*z_diff;
 }

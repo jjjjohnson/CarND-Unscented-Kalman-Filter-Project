@@ -41,5 +41,5 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
 
 void Tools::Normalize(VectorXd &x_diff, int i) {
   while (x_diff(i)> M_PI) x_diff(i)-=2.*M_PI;
-  while (x_diff(i)<-M_PI) x_diff(i)+=2.*M_PI;
+  while (x_diff(i)< -M_PI) x_diff(i)+=2.*M_PI;
 }

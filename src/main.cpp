@@ -5,6 +5,7 @@
 #include "ukf.h"
 #include "tools.h"
 
+
 using namespace std;
 
 // for convenience
@@ -37,6 +38,8 @@ int main()
   Tools tools;
   vector<VectorXd> estimations;
   vector<VectorXd> ground_truth;
+
+//  ofstream out_file_("NIS.txt", ofstream::out);
 
   h.onMessage([&ukf,&tools,&estimations,&ground_truth](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -104,9 +107,22 @@ int main()
     	  gt_values(2) = vx_gt;
     	  gt_values(3) = vy_gt;
     	  ground_truth.push_back(gt_values);
-          
+
+          double counter;
+
+          if (!ukf.is_initialized_) {
+            ofstream out_file_("../result/NIS.csv", ofstream::out);
+            out_file_ << "Count" << "\t";
+            out_file_ << "NIS" << "\n";
+            counter = 0;
+          }
           //Call ProcessMeasurment(meas_package) for Kalman filter
     	  ukf.ProcessMeasurement(meas_package);
+
+          ofstream out_file_("../result/NIS.csv", ofstream::app);
+          out_file_ << counter << "\t";
+          out_file_ << ukf.NIS << "\n";
+          counter += 1;
     	  //Push the current estimated x,y positon from the Kalman filter's state vector
 
     	  VectorXd estimate(4);

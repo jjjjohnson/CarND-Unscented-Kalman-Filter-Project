@@ -1,6 +1,7 @@
 #ifndef UKF_H
 #define UKF_H
 
+#include <fstream>
 #include "measurement_package.h"
 #include "Eigen/Dense"
 #include <vector>
@@ -68,6 +69,7 @@ public:
   double lambda_;
 
     Tools tools;
+    double NIS;
 
   /**
    * Constructor
