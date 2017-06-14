@@ -47,9 +47,10 @@ UKF::UKF() {
   n_x_ = 5;
   n_aug_ = 7;
   lambda_ = 3 - n_aug_;
-  is_initialized_=false;
+  is_initialized_ = false;
 
   MatrixXd Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
+
   VectorXd weights_ = VectorXd(2*n_aug_+1);
   double weight_0 = lambda_/(lambda_+n_aug_);
   weights_(0) = weight_0;
@@ -175,6 +176,22 @@ void UKF::Prediction(double delta_t) {
     Xsig_pred_(3,i) = yaw_p;
     Xsig_pred_(4,i) = yawd_p;
   }
+
+  // Predict the state mean
+  x_.fill(0.0);
+  for (int i = 0; i < 2*n_aug_ + 1; ++i){
+    x_ += weights_(i) * Xsig_pred_.col(i);
+  }
+
+  // Predict state covariance
+  P_.fill(0.0);
+  for (int i = 0; i < 2*n_aug_ + 1; ++i){
+    //state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    while (x_diff(3) > M_PI) x_diff(3) -= 2*M_PI;
+    while (x_diff(3) < -M_PI) x_diff(3) += 2*M_PI;
+    P_ = P_ + weights_(i) * x_diff * x_diff.transpose();
+  }
 }
 
 /**
@@ -204,19 +221,21 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   //measurement covariance matrix S
   MatrixXd S = MatrixXd(n_z,n_z);
   S.fill(0.0);
+  //create matrix for cross correlation Tc for ladar
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+  Tc.fill(0.0);
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
     //residual
     VectorXd z_diff = Zsig.col(i) - z_pred;
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
     S = S + weights_(i) * z_diff * z_diff.transpose();
+    Tc += weights_(i) * x_diff * z_diff.transpose();
   }
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z,n_z);
   R <<    std_laspx_*std_laspx_, 0,
           0, std_laspy_*std_laspy_;
   S = S + R;
-
-  //create matrix for cross correlation Tc
-  MatrixXd Tc = MatrixXd(n_x_, n_z);
 
   //Kalman gain K;
   MatrixXd K = Tc * S.inverse();
@@ -228,7 +247,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
 
-  double NIS = z_diff.transpose()*S.inverse()*z_diff;
+//  double NIS = z_diff.transpose()*S.inverse()*z_diff;
 }
 
 /**
@@ -269,14 +288,23 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   //measurement covariance matrix S
   MatrixXd S = MatrixXd(n_z,n_z);
   S.fill(0.0);
+  //create matrix for cross correlation Tc
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+  //calculate cross correlation matrix
+  Tc.fill(0.0);
+
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
     //residual
     VectorXd z_diff = Zsig.col(i) - z_pred;
-
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
     while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
     while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+    //angle normalization
+    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
+    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
 
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
     S = S + weights_(i) * z_diff * z_diff.transpose();
   }
   //add measurement noise covariance matrix
@@ -285,28 +313,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
           0, std_radphi_*std_radphi_, 0,
           0, 0,std_radrd_*std_radrd_;
   S = S + R;
-
-  //create matrix for cross correlation Tc
-  MatrixXd Tc = MatrixXd(n_x_, n_z);
-
-  //calculate cross correlation matrix
-  Tc.fill(0.0);
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //2n+1 simga points
-
-    //residual
-    VectorXd z_diff = Zsig.col(i) - z_pred;
-    //angle normalization
-    while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-    while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
-
-    // state difference
-    VectorXd x_diff = Xsig_pred_.col(i) - x_;
-    //angle normalization
-    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
-
-    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
-  }
 
   //Kalman gain K;
   MatrixXd K = Tc * S.inverse();
@@ -322,5 +328,5 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
 
-  double NIS = z_diff.transpose()*S.inverse()*z_diff;
+//  double NIS = z_diff.transpose()*S.inverse()*z_diff;
 }
